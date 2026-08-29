@@ -88,7 +88,7 @@ const PRECAUTION_DATA = [
   },
   {
     type: 'Earthquake',
-    image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80',
+    image: https://images.unsplash.com/photo-1677233860259-ce1a8e0f8498?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D,
     rules: ['Drop, Cover, and Hold on.', 'Stay away from outer walls and glass windows.', 'If outside, clear buildings and overhead wires.']
   },
   {
