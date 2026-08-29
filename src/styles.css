@@ -1,60 +1,67 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
+/* Apply video font and dark theme globally */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
 }
 
-body {
-  background-color: #0d0e12;
-  color: #f3f4f6;
+/* Video exact background color (#0d0e12) */
+body, #root {
+  background-color: #0d0e12 !important;
+  color: #f3f4f6 !important;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Background Card Styling */
-.bg-dark-card {
-  background: #12141a;
-  border: 1px solid #232733;
-  border-radius: 16px;
-}
-
-.bg-dark-input {
-  background: #181a20;
-  border: 1px solid #272a34;
+/* Background overrides for all cards, forms, and containers */
+div, section, header, nav, form, .card, .container, main {
+  background-color: #12141a;
+  border-color: #232733 !important;
   color: #ffffff;
 }
 
-/* Accent Button Styling matching video */
-.btn-accent-orange {
-  background: #ea580c;
-  color: #ffffff;
-  font-weight: 600;
-  border-radius: 10px;
-  border: none;
-  transition: background 0.2s;
+/* Background overrides for all text inputs, textareas, and select dropdowns */
+input, textarea, select {
+  background-color: #181a20 !important;
+  border: 1px solid #272a34 !important;
+  color: #ffffff !important;
+  border-radius: 8px;
 }
 
-.btn-accent-orange:hover {
-  background: #c2410c;
+input:focus, textarea:focus, select:focus {
+  border-color: #ea580c !important;
+  outline: none;
 }
 
-/* Badge & Status Styles */
-.badge-pill-orange {
-  background: #1f1412;
-  border: 1px solid #431f13;
-  color: #f97316;
-  border-radius: 999px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+/* Accent primary buttons (Orange color match from video) */
+button, .btn, input[type="submit"] {
+  background-color: #ea580c !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 600 !important;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
 }
 
-.badge-live-green {
-  background: #064e3b;
-  color: #34d399;
-  border-radius: 999px;
-  font-weight: 700;
+button:hover, .btn:hover, input[type="submit"]:hover {
+  background-color: #c2410c !important;
+}
+
+/* Secondary / Dark buttons */
+button.secondary, .btn-secondary {
+  background-color: #16181e !important;
+  border: 1px solid #272a34 !important;
+  color: #ffffff !important;
+}
+
+/* Text color adjustments for muted descriptions */
+p, span, label, small {
+  color: #9ca3af;
+}
+
+h1, h2, h3, h4, h5, h6, strong {
+  color: #ffffff !important;
 }
