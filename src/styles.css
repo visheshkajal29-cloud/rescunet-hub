@@ -8,8 +8,10 @@
 }
 
 body {
-  background-color: #0d0e12;
-  color: #f3f4f6;
+  background-color: #f4f6f9;
+  background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+  background-size: 24px 24px;
+  color: #1e293b;
   min-height: 100vh;
   overflow-x: hidden;
 }
@@ -23,14 +25,17 @@ body {
   flex-direction: column;
 }
 
-/* Header Navbar */
+/* Light Navigation Header */
 .navbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0 20px 0;
-  border-bottom: 1px solid #232733;
+  padding: 14px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
   margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -38,7 +43,7 @@ body {
 .brand-logo {
   font-size: 1.25rem;
   font-weight: 800;
-  color: #ffffff;
+  color: #0f172a;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -47,8 +52,8 @@ body {
 }
 
 .badge-status {
-  background: #064e3b;
-  color: #34d399;
+  background: #ecfdf5;
+  color: #059669;
   padding: 6px 12px;
   border-radius: 999px;
   font-size: 0.78rem;
@@ -56,23 +61,23 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid #059669;
+  border: 1px solid #a7f3d0;
 }
 
 .badge-status.offline {
-  background: #451a03;
-  color: #fb923c;
-  border-color: #ea580c;
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #ffedd5;
 }
 
-/* Cards & Containers */
+/* White Glassmorphic Cards */
 .dark-card {
-  background: #12141a;
-  border: 1px solid #232733;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 24px;
   margin-bottom: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
 }
 
 .input-group {
@@ -83,18 +88,18 @@ body {
 .input-group label {
   display: block;
   font-size: 0.82rem;
-  color: #9ca3af;
+  color: #475569;
   margin-bottom: 6px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .input-box {
   width: 100%;
-  background: #181a20;
-  border: 1px solid #272a34;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
   border-radius: 10px;
   padding: 12px 14px;
-  color: #ffffff;
+  color: #0f172a;
   font-size: 0.92rem;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -102,7 +107,8 @@ body {
 
 .input-box:focus {
   border-color: #ea580c;
-  box-shadow: 0 0 12px rgba(234, 88, 12, 0.25);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15);
 }
 
 /* Buttons */
@@ -120,7 +126,7 @@ body {
   justify-content: center;
   align-items: center;
   gap: 8px;
-  transition: background 0.2s;
+  transition: background 0.2s, transform 0.1s;
 }
 
 .btn-primary:hover {
@@ -137,7 +143,7 @@ body {
   border: none;
   cursor: pointer;
   width: 100%;
-  box-shadow: 0 0 25px rgba(220, 38, 38, 0.45);
+  box-shadow: 0 10px 20px rgba(220, 38, 38, 0.25);
   transition: transform 0.1s, background 0.2s;
   letter-spacing: 0.5px;
 }
@@ -154,27 +160,28 @@ body {
 }
 
 .interactive-card {
-  background: #12141a;
-  border: 1px solid #232733;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
   padding: 20px;
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.2s, background 0.2s;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03);
 }
 
 .interactive-card:hover {
   border-color: #ea580c;
   transform: translateY(-2px);
-  background: #171a22;
+  box-shadow: 0 12px 20px -5px rgba(234, 88, 12, 0.1);
 }
 
-/* Incident Radar Styling (From Video UI) */
+/* Radar Display (Adapted for Light Theme) */
 .radar-box {
   width: 100%;
   height: 240px;
-  background: #090a0d;
+  background: #0f172a;
   border-radius: 16px;
-  border: 1px solid #232733;
+  border: 1px solid #1e293b;
   position: relative;
   overflow: hidden;
   display: flex;
@@ -184,7 +191,7 @@ body {
 
 .radar-circle {
   position: absolute;
-  border: 1px solid rgba(234, 88, 12, 0.25);
+  border: 1px solid rgba(234, 88, 12, 0.35);
   border-radius: 50%;
 }
 
@@ -197,7 +204,7 @@ body {
   width: 220px;
   height: 220px;
   border-radius: 50%;
-  background: conic-gradient(from 0deg, rgba(234, 88, 12, 0.35) 0deg, transparent 60deg, transparent 360deg);
+  background: conic-gradient(from 0deg, rgba(234, 88, 12, 0.45) 0deg, transparent 60deg, transparent 360deg);
   animation: spin 4s linear infinite;
 }
 
@@ -224,24 +231,26 @@ body {
 }
 
 .disaster-item {
-  background: #181a20;
-  border: 1px solid #272a34;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 16px 10px;
   text-align: center;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
+  color: #334155;
 }
 
 .disaster-item:hover, .disaster-item.active {
   border-color: #ea580c;
-  background: #201715;
+  background: #fff7ed;
+  color: #c2410c;
 }
 
-/* Victim Condition List */
+/* Severity Cards */
 .condition-card {
-  background: #181a20;
-  border: 1px solid #272a34;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 12px;
@@ -250,11 +259,12 @@ body {
   gap: 16px;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
+  color: #1e293b;
 }
 
 .condition-card.active {
   border-color: #ea580c;
-  background: #201715;
+  background: #fff7ed;
 }
 
 /* Bottom Navigation Bar for Mobile */
@@ -263,12 +273,13 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  background: #12141a;
-  border-top: 1px solid #232733;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
   display: flex;
   justify-content: space-around;
   padding: 10px 0;
   z-index: 1000;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .nav-item {
@@ -277,11 +288,11 @@ body {
   align-items: center;
   gap: 4px;
   font-size: 0.72rem;
-  color: #9ca3af;
+  color: #64748b;
   cursor: pointer;
   background: none;
   border: none;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .nav-item.active {
