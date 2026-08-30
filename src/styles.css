@@ -1,13 +1,9 @@
 :root {
-  --primary: #0f172a;
-  --accent: #dc2626;
-  --accent-hover: #b91c1c;
-  --success: #16a34a;
-  --warning: #d97706;
-  --bg: #f8fafc;
+  --bg: #0f172a;
   --card-bg: #ffffff;
-  --text: #1e293b;
+  --text: #0f172a;
   --muted: #64748b;
+  --accent: #dc2626;
   --border: #e2e8f0;
 }
 
@@ -15,11 +11,11 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 body {
-  background-color: var(--bg);
+  background-color: #f8fafc;
   color: var(--text);
   display: flex;
   justify-content: center;
@@ -29,103 +25,81 @@ body {
 #root {
   width: 100%;
   max-width: 480px;
-  background: var(--card-bg);
+  background: #ffffff;
   min-height: 100vh;
+  position: relative;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  box-shadow: 0 0 20px rgba(0,0,0,0.05);
-  position: relative;
-}
-
-@media (min-width: 1024px) {
-  #root.admin-mode {
-    max-width: 1200px;
-  }
 }
 
 .header {
-  background: var(--primary);
-  color: white;
-  padding: 1rem;
+  padding: 0.85rem 1rem;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 10;
+}
+
+/* Header Logo Styling */
+.header-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+/* Main Landing Logo Styling */
+.landing-logo-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.landing-logo {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.1));
 }
 
 .network-badge {
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
-  border-radius: 999px;
-  font-weight: 600;
+  border-radius: 12px;
+  font-weight: bold;
 }
 
 .network-badge.online {
   background: #dcfce7;
-  color: #15803d;
+  color: #166534;
 }
 
 .network-badge.offline {
   background: #fee2e2;
-  color: #b91c1c;
+  color: #991b1b;
 }
 
 .container {
-  padding: 1.25rem;
+  padding: 1rem;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1rem;
   padding-bottom: 5rem;
 }
 
 .card {
-  background: white;
+  background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-.btn {
-  width: 100%;
-  padding: 0.85rem;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 1rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-}
-
-.btn-primary {
-  background: var(--primary);
-  color: white;
-}
-
-.btn-danger {
-  background: var(--accent);
-  color: white;
-}
-
-.btn-danger:hover {
-  background: var(--accent-hover);
-}
-
-.btn-outline {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text);
-}
-
-.btn-success {
-  background: var(--success);
-  color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .grid-2 {
@@ -136,60 +110,68 @@ body {
 
 .grid-4 {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: 1fr 1fr;
   gap: 0.5rem;
 }
 
-.sos-hold-btn {
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: white;
-  border: 6px solid #fecaca;
-  font-weight: 800;
-  font-size: 1.2rem;
-  margin: 1rem auto;
+.btn {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: bold;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  transition: transform 0.1s ease, background 0.2s ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary { background: #0f172a; color: white; }
+.btn-danger { background: #dc2626; color: white; }
+.btn-success { background: #16a34a; color: white; }
+.btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+
+/* Extra Large Emergency Access Button */
+.btn-emergency-large {
+  padding: 1.15rem 1rem !important;
+  font-size: 1.15rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 1.5px !important;
+  border-radius: 12px !important;
+  background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.45) !important;
+  margin-top: 0.5rem;
+}
+
+.sos-hold-btn {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: #dc2626;
+  color: white;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  user-select: none;
-  transition: transform 0.1s;
-}
-
-.sos-hold-btn:active {
-  transform: scale(0.95);
-}
-
-.nav-bar {
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  max-width: 480px;
-  background: white;
-  border-top: 1px solid var(--border);
-  display: flex;
-  justify-content: space-around;
-  padding: 0.5rem 0;
-  z-index: 100;
-}
-
-.nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  font-size: 0.75rem;
-  color: var(--muted);
-  background: none;
-  border: none;
+  margin: 1rem auto;
   cursor: pointer;
+  box-shadow: 0 0 15px rgba(220, 38, 38, 0.5);
+  user-select: none;
 }
 
-.nav-item.active {
-  color: var(--accent);
-  font-weight: bold;
+.input-field {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
 }
 
 .map-container {
@@ -200,13 +182,33 @@ body {
   border: 1px solid var(--border);
 }
 
-.input-field {
+.nav-bar {
+  position: fixed;
+  bottom: 0;
   width: 100%;
-  padding: 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  margin-top: 0.25rem;
-  margin-bottom: 0.75rem;
+  max-width: 480px;
+  background: #ffffff;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-around;
+  padding: 0.5rem 0;
+  z-index: 10;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.7rem;
+  color: var(--muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.nav-item.active {
+  color: #dc2626;
+  font-weight: bold;
 }
 
 .stat-box {
@@ -214,8 +216,79 @@ body {
   border-radius: 8px;
   text-align: center;
 }
-
 .stat-critical { background: #fee2e2; color: #991b1b; }
 .stat-urgent { background: #fef3c7; color: #92400e; }
 .stat-assistance { background: #e0f2fe; color: #075985; }
 .stat-safe { background: #dcfce7; color: #166534; }
+
+.sms-number-tag {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 0.35rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid #fca5a5;
+}
+
+/* Animated Banner Styles for THE RESOLVERS */
+@keyframes resolversGlow {
+  0% {
+    background-position: 0% 50%;
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.4);
+  }
+  50% {
+    background-position: 100% 50%;
+    box-shadow: 0 0 20px rgba(220, 38, 38, 0.8), 0 0 30px rgba(239, 68, 68, 0.5);
+  }
+  100% {
+    background-position: 0% 50%;
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.4);
+  }
+}
+
+.resolvers-animated-banner {
+  background: linear-gradient(270deg, #dc2626, #ef4444, #991b1b, #dc2626);
+  background-size: 300% 300%;
+  animation: resolversGlow 3s ease infinite;
+  padding: 0.65rem 1.25rem;
+  border-radius: 30px;
+  display: inline-block;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.resolvers-text {
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 0.85rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* Sharp Green Precautions Card Styling */
+.precautions-green-card {
+  background-color: #f0fdf4 !important;
+  border: 1.5px solid #86efac !important;
+  box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.1), 0 2px 4px -1px rgba(22, 163, 74, 0.06);
+}
+
+.precautions-section-title {
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: #15803d;
+  letter-spacing: 0.5px;
+}
+
+.precautions-green-list {
+  padding-left: 1.25rem;
+  margin: 0.35rem 0;
+  font-size: 0.85rem;
+  color: #166534;
+}
+
+.precautions-green-list li {
+  margin-bottom: 0.35rem;
+  line-height: 1.4;
+}
