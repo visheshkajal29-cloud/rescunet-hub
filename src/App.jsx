@@ -1,602 +1,458 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Flame, Radio, Shield, MapPin, AlertTriangle, Activity, 
-  Phone, CheckCircle2, BookOpen, Compass, Monitor, ArrowLeft, 
-  Navigation, Heart, RefreshCw, Waves, Wind, Mountain, Trash2, RotateCcw
+  Shield, AlertTriangle, Phone, CheckCircle, 
+  Flame, CloudRain, Zap, Activity, Info, RefreshCw, Trash2, Home, Map as MapIcon, Settings, DollarSign 
 } from 'lucide-react';
+
+const INITIAL_STATS = { critical: 28, urgent: 54, assistance: 91, safe: 312 };
+
+const DISASTER_TYPES = [
+  { id: 'earthquake', label: 'Earthquake', icon: Activity },
+  { id: 'flood', label: 'Flood', icon: CloudRain },
+  { id: 'fire', label: 'Fire', icon: Flame },
+  { id: 'cyclone', label: 'Cyclone', icon: Zap },
+  { id: 'landslide', label: 'Landslide', icon: AlertTriangle },
+  { id: 'heatwave', label: 'Heatwave', icon: Info },
+  { id: 'industrial', label: 'Industrial Accident', icon: AlertTriangle },
+  { id: 'other', label: 'Other', icon: Info }
+];
+
+const PRECAUTIONS = {
+  earthquake: {
+    during: ["Drop to hands and knees", "Cover head and neck under sturdy table", "Hold on until shaking stops"],
+    after: ["Check for injuries", "Stay away from damaged buildings", "Move to an open safe area", "Send SOS if needed"]
+  },
+  flood: {
+    during: ["Move immediately to higher ground", "Do not walk or drive through moving water", "Avoid electrical lines"],
+    after: ["Listen to local authorities", "Return home only when safe", "Clean and disinfect everything touched by water"]
+  },
+  fire: {
+    during: ["Stay low to the floor", "Check door handles for heat before opening", "Stop, Drop, and Roll if clothing catches fire"],
+    after: ["Do not enter burned buildings", "Seek immediate medical treatment for burns", "Notify emergency responders"]
+  }
+};
 
 export default function App() {
   const [screen, setScreen] = useState('landing');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  
-  // Location State
-  const [coords, setCoords] = useState({ lat: '12.3456', lng: '78.9101' });
-  const [address, setAddress] = useState('Fetching automatic location...');
-  const [isLocating, setIsLocating] = useState(false);
+  const [location, setLocation] = useState({ lat: 28.6139, lng: 77.2090, address: 'Detecting Location...' });
+  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('dm_user')) || null);
+  const [complaints, setComplaints] = useState(() => JSON.parse(localStorage.getItem('dm_reports')) || []);
+  const [stats, setStats] = useState(() => JSON.parse(localStorage.getItem('dm_stats')) || INITIAL_STATS);
+  const [activeReport, setActiveReport] = useState({ type: '', condition: '' });
+  const [holdTimer, setHoldTimer] = useState(null);
 
-  // Disaster Reporting Form State
-  const [selectedDisaster, setSelectedDisaster] = useState('Earthquake');
-  const [selectedSeverity, setSelectedSeverity] = useState('CRITICAL');
-  const [reportDesc, setReportDesc] = useState('');
-  
-  // Storage States
-  const [reports, setReports] = useState(() => {
-    const saved = localStorage.getItem('dm_reports');
-    return saved ? JSON.parse(saved) : [
-      { id: '#1023', type: 'Earthquake', severity: 'CRITICAL', desc: 'Trapped in damaged structure', location: 'Delhi, India', time: '10:30 AM', people: 3, dist: '1.2 km' },
-      { id: '#1024', type: 'Flood', severity: 'CRITICAL', desc: 'Rising water level on 1st floor', location: 'Patna, Bihar', time: '10:32 AM', people: 1, dist: '2.1 km' },
-      { id: '#1025', type: 'Landslide', severity: 'URGENT', desc: 'Road blocked, medical help needed', location: 'Shimla, HP', time: '10:35 AM', people: 2, dist: '3.4 km' }
-    ];
-  });
+  const mapRef = useRef(null);
+  const leafletMap = useRef(null);
 
-  const [activeGuide, setActiveGuide] = useState('Earthquake');
-  const [selectedCase, setSelectedCase] = useState(null);
-
-  // User Profile State
-  const [userProfile, setUserProfile] = useState(() => {
-    const saved = localStorage.getItem('dm_profile');
-    return saved ? JSON.parse(saved) : { name: '', phone: '', emergencyPhone: '', pin: '', blood: '', allergies: '', conditions: '' };
-  });
-
-  // Safe Status Log
-  const [safeStatusLogged, setSafeStatusLogged] = useState(false);
-  const [lastSafeTime, setLastSafeTime] = useState('10:35 AM');
-
-  // Monitor Network Connection Status
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setLocation({ lat, lng, address: `${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E` });
+        },
+        () => setLocation({ lat: 28.6139, lng: 77.2090, address: 'New Delhi (Default Offline)' })
+      );
+    }
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
-  // Save Reports to LocalStorage
   useEffect(() => {
-    localStorage.setItem('dm_reports', JSON.stringify(reports));
-  }, [reports]);
+    localStorage.setItem('dm_reports', JSON.stringify(complaints));
+  }, [complaints]);
 
-  // Automatic GPS Location
-  const fetchLocation = () => {
-    setIsLocating(true);
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude.toFixed(4);
-          const lng = position.coords.longitude.toFixed(4);
-          setCoords({ lat, lng });
+  useEffect(() => {
+    localStorage.setItem('dm_stats', JSON.stringify(stats));
+  }, [stats]);
 
-          if (navigator.onLine) {
-            try {
-              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-              const data = await res.json();
-              setAddress(data.display_name || `${lat}° N, ${lng}° E`);
-            } catch (err) {
-              setAddress(`${lat}° N, ${lng}° E`);
-            }
-          } else {
-            setAddress(`Cached Coords: ${lat}° N, ${lng}° E`);
-          }
-          setIsLocating(false);
-        },
-        () => {
-          setAddress('Location permission denied / unavailable');
-          setIsLocating(false);
-        },
-        { timeout: 10000 }
-      );
-    } else {
-      setAddress('Geolocation not supported by device');
-      setIsLocating(false);
+  useEffect(() => {
+    if ((screen === 'map' || screen === 'admin') && mapRef.current && window.L) {
+      if (leafletMap.current) {
+        leafletMap.current.remove();
+      }
+      const map = window.L.map(mapRef.current).setView([location.lat, location.lng], 13);
+      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
+      }).addTo(map);
+
+      window.L.marker([location.lat, location.lng]).addTo(map).bindPopup('My Location').openPopup();
+
+      complaints.forEach((c) => {
+        if (c.lat && c.lng) {
+          window.L.marker([c.lat, c.lng]).addTo(map).bindPopup(`${c.type} (${c.condition})`);
+        }
+      });
+
+      leafletMap.current = map;
     }
+  }, [screen, location, complaints]);
+
+  const handleSosHoldStart = () => {
+    const timer = setTimeout(() => {
+      triggerSos();
+    }, 3000);
+    setHoldTimer(timer);
   };
 
-  useEffect(() => {
-    fetchLocation();
-  }, []);
+  const handleSosHoldEnd = () => {
+    if (holdTimer) clearTimeout(holdTimer);
+  };
 
-  // Handle New Incident Report Submit
-  const handleReportSubmit = (e) => {
-    e.preventDefault();
+  const triggerSos = () => {
     const newReport = {
-      id: `#${Math.floor(1000 + Math.random() * 9000)}`,
-      type: selectedDisaster,
-      severity: selectedSeverity,
-      desc: reportDesc || 'Immediate emergency response requested.',
-      location: address,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      people: 1,
-      dist: '0.1 km'
+      id: 'DM-' + Math.floor(1000 + Math.random() * 9000),
+      type: activeReport.type || 'Emergency SOS',
+      condition: activeReport.condition || 'CRITICAL',
+      lat: location.lat,
+      lng: location.lng,
+      address: location.address,
+      time: new Date().toLocaleTimeString(),
+      status: 'Searching'
     };
-    setReports([newReport, ...reports]);
-    setReportDesc('');
-    setScreen('sos_active');
+    setComplaints([newReport, ...complaints]);
+    setStats((prev) => ({ ...prev, critical: prev.critical + 1 }));
+    setScreen('sos-active');
   };
 
-  // Delete Complaint Function
-  const handleDeleteReport = (id) => {
-    const updated = reports.filter((report) => report.id !== id);
-    setReports(updated);
-    if (selectedCase && selectedCase.id === id) {
-      setSelectedCase(null);
-    }
+  const handleDeleteComplaint = (id) => {
+    setComplaints(complaints.filter((item) => item.id !== id));
   };
 
-  // Reset System Counters and Complaints to 0
-  const handleResetSystem = () => {
-    if (window.confirm('Are you sure you want to reset all reported complaints and counters to 0?')) {
-      setReports([]);
-      setSelectedCase(null);
-      localStorage.removeItem('dm_reports');
-    }
+  const handleResetStats = () => {
+    setStats(INITIAL_STATS);
+    localStorage.setItem('dm_stats', JSON.stringify(INITIAL_STATS));
   };
 
-  // Calculated Counters for Admin Dashboard
-  const criticalCount = reports.filter((r) => r.severity === 'CRITICAL').length;
-  const urgentCount = reports.filter((r) => r.severity === 'URGENT').length;
-  const safeCount = reports.filter((r) => r.severity === 'SAFE').length;
-
-  const HELPLINES = [
-    { name: 'National Emergency Number', number: '112' },
-    { name: 'Disaster Management (NDRF)', number: '1078' },
-    { name: 'Police Helpline', number: '100' },
-    { name: 'Fire Station', number: '101' },
-    { name: 'Ambulance Medical', number: '102' },
-    { name: 'Women Helpline', number: '1091' }
-  ];
-
-  const DISASTERS = [
-    { id: 'Flood', label: 'Flood', icon: Waves },
-    { id: 'Earthquake', label: 'Earthquake', icon: AlertTriangle },
-    { id: 'Cyclone', label: 'Cyclone', icon: Wind },
-    { id: 'Landslide', label: 'Landslide', icon: Mountain },
-    { id: 'Wildfire', label: 'Wildfire', icon: Flame },
-    { id: 'Tsunami', label: 'Tsunami', icon: Activity }
-  ];
-
-  const GUIDES = {
-    Earthquake: {
-      during: ['Drop, Cover, and Hold On under sturdy furniture.', 'Stay away from windows and exterior walls.', 'If outdoors, move to an open area away from buildings.'],
-      after: ['Check yourself and others for injuries.', 'Stay away from damaged structures.', 'Listen to emergency broadcasts and send SOS if trapped.']
-    },
-    Flood: {
-      during: ['Move to higher ground immediately.', 'Do not walk or drive through flowing floodwaters.', 'Disconnect electrical appliances.'],
-      after: ['Avoid floodwater as it may be contaminated.', 'Return home only when authorities confirm safety.']
-    }
+  const handleRegister = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const userData = Object.fromEntries(formData.entries());
+    setUser(userData);
+    localStorage.setItem('dm_user', JSON.stringify(userData));
+    setScreen('home');
   };
 
   return (
-    <div className="app-container" style={{ paddingBottom: '75px' }}>
-      
-      {/* NAVBAR */}
-      <header className="navbar">
-        <div className="brand-logo" onClick={() => setScreen('home')}>
-          <Flame color="#ea580c" size={26} />
-          <span>DisasterMesh</span>
+    <div className={screen === 'admin' ? 'admin-mode' : ''}>
+      <header className="header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Shield color="#dc2626" size={24} />
+          <strong style={{ fontSize: '1.1rem' }}>DisasterMesh</strong>
         </div>
-
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <div className={`badge-status ${!isOnline ? 'offline' : ''}`}>
-            <Radio size={14} /> {isOnline ? 'Connected (Online)' : 'Offline Mesh Active'}
-          </div>
-          <button 
-            style={{ background: '#181a20', border: '1px solid #272a34', color: '#fff', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem' }}
-            onClick={() => setScreen(screen === 'command_center' ? 'home' : 'command_center')}
-          >
-            <Monitor size={14} style={{ display: 'inline', marginRight: '4px' }} />
-            {screen === 'command_center' ? 'App View' : 'Admin Hub'}
-          </button>
-        </div>
+        <span className={`network-badge ${isOnline ? 'online' : 'offline'}`}>
+          {isOnline ? 'ONLINE' : 'OFFLINE MODE'}
+        </span>
       </header>
 
-      {/* LANDING SCREEN */}
       {screen === 'landing' && (
-        <div className="dark-card" style={{ textAlign: 'center', maxWidth: '480px', margin: 'auto' }}>
-          <Flame color="#ea580c" size={52} style={{ margin: '0 auto 16px' }} />
-          <h1 style={{ fontSize: '2.1rem', fontWeight: '800', marginBottom: '8px' }}>DISASTERMESH</h1>
-          <p style={{ color: '#ea580c', fontStyle: 'italic', fontWeight: '600', marginBottom: '12px', fontSize: '0.95rem' }}>
-            "When the Network Fails, We Stay Connected."
-          </p>
-          <p style={{ color: '#9ca3af', fontSize: '0.88rem', marginBottom: '24px' }}>
-            Offline-first emergency communication and disaster response network.
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button className="btn-primary" onClick={() => setScreen('signup')}>GET STARTED</button>
-            <button className="btn-primary" style={{ background: '#181a20', border: '1px solid #272a34' }} onClick={() => setScreen('login')}>LOGIN</button>
-            
-            <div style={{ marginTop: '16px', borderTop: '1px solid #232733', paddingTop: '16px' }}>
-              <button className="btn-sos" onClick={() => setScreen('home')}>
-                🚨 EMERGENCY ACCESS
-              </button>
-            </div>
-          </div>
+        <div className="container" style={{ textAlign: 'center', justifyContent: 'center' }}>
+          <Shield size={64} color="#dc2626" style={{ margin: '0 auto' }} />
+          <h2>DISASTERMESH</h2>
+          <p style={{ color: 'var(--muted)' }}>"When the Network Fails, We Stay Connected."</p>
+          <p style={{ fontSize: '0.85rem' }}>Offline-first emergency communication and disaster response.</p>
+          <button className="btn btn-primary" onClick={() => setScreen('register')}>GET STARTED</button>
+          <button className="btn btn-outline" onClick={() => setScreen('login')}>LOGIN</button>
+          <button className="btn btn-danger" onClick={() => setScreen('home')}>EMERGENCY ACCESS</button>
         </div>
       )}
 
-      {/* LOGIN SCREEN */}
       {screen === 'login' && (
-        <div className="dark-card" style={{ maxWidth: '420px', margin: '0 auto' }}>
-          <button style={{ background: 'none', border: 'none', color: '#ea580c', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '16px' }} onClick={() => setScreen('landing')}>
-            <ArrowLeft size={16} /> Back
-          </button>
-          <h2 style={{ fontSize: '1.7rem', marginBottom: '6px' }}>Welcome Back</h2>
-
-          <div className="input-group">
+        <div className="container">
+          <h2>Welcome Back</h2>
+          <p style={{ color: 'var(--muted)' }}>Access your DisasterMesh emergency profile</p>
+          <form onSubmit={(e) => { e.preventDefault(); setScreen('home'); }}>
             <label>Mobile Number</label>
-            <input type="text" className="input-box" placeholder="+91 9876543210" value={userProfile.phone} onChange={(e) => setUserProfile({...userProfile, phone: e.target.value})} />
-          </div>
-
-          <div className="input-group">
-            <label>PIN Code</label>
-            <input type="password" className="input-box" placeholder="••••" value={userProfile.pin} onChange={(e) => setUserProfile({...userProfile, pin: e.target.value})} />
-          </div>
-
-          <button className="btn-primary" style={{ marginTop: '12px' }} onClick={() => setScreen('home')}>LOGIN</button>
+            <input className="input-field" type="tel" required />
+            <label>PIN</label>
+            <input className="input-field" type="password" required />
+            <button className="btn btn-primary" type="submit">LOGIN</button>
+          </form>
+          <button className="btn btn-outline" onClick={() => setScreen('register')}>Don't have an account? SIGN UP</button>
+          <button className="btn btn-danger" onClick={() => setScreen('home')}>EMERGENCY SOS</button>
         </div>
       )}
 
-      {/* SIGNUP SCREEN */}
-      {screen === 'signup' && (
-        <div className="dark-card" style={{ maxWidth: '460px', margin: '0 auto' }}>
-          <button style={{ background: 'none', border: 'none', color: '#ea580c', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '16px' }} onClick={() => setScreen('landing')}>
-            <ArrowLeft size={16} /> Back
-          </button>
-          <h2 style={{ fontSize: '1.7rem', marginBottom: '6px' }}>Create Account</h2>
-
-          <div className="input-group">
+      {screen === 'register' && (
+        <div className="container">
+          <h2>Create Account</h2>
+          <form onSubmit={handleRegister}>
             <label>Full Name</label>
-            <input type="text" className="input-box" placeholder="Full Name" value={userProfile.name} onChange={(e) => setUserProfile({...userProfile, name: e.target.value})} />
-          </div>
-
-          <div className="input-group">
+            <input className="input-field" name="name" required />
             <label>Mobile Number</label>
-            <input type="text" className="input-box" placeholder="Mobile Number" value={userProfile.phone} onChange={(e) => setUserProfile({...userProfile, phone: e.target.value})} />
-          </div>
-
-          <button className="btn-primary" style={{ marginTop: '16px' }} onClick={() => {
-            localStorage.setItem('dm_profile', JSON.stringify(userProfile));
-            setScreen('home');
-          }}>
-            CREATE ACCOUNT
-          </button>
+            <input className="input-field" name="mobile" required />
+            <label>Emergency Contact</label>
+            <input className="input-field" name="emergency" required />
+            <label>Set PIN</label>
+            <input className="input-field" type="password" name="pin" required />
+            <h3>Medical Info (Optional)</h3>
+            <label>Blood Type</label>
+            <input className="input-field" name="blood" placeholder="e.g. O+" />
+            <button className="btn btn-primary" type="submit">CREATE ACCOUNT</button>
+          </form>
+          <button className="btn btn-outline" onClick={() => setScreen('login')}>Already have an account? LOGIN</button>
         </div>
       )}
 
-      {/* HOME DASHBOARD */}
       {screen === 'home' && (
-        <div>
-          <div className="dark-card" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', alignItems: 'center' }}>
-            <div>
-              <span style={{ color: '#ea580c', fontSize: '0.78rem', fontWeight: '700', letterSpacing: '1px' }}>COMMUNITY EMERGENCY NETWORK</span>
-              <h1 style={{ fontSize: '2.5rem', fontWeight: '800', margin: '8px 0 12px', lineHeight: '1.1' }}>
-                Turn a warning <br /><span style={{ color: '#ea580c' }}>into action.</span>
-              </h1>
-              <p style={{ color: '#9ca3af', fontSize: '0.88rem', marginBottom: '20px' }}>
-                Report natural disasters in seconds. Your information reaches the central dashboard immediately.
-              </p>
-              
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <button className="btn-sos" style={{ padding: '14px 20px', fontSize: '1rem', width: 'auto' }} onClick={() => setScreen('sos_active')}>
-                  🚨 EMERGENCY SOS
-                </button>
-                <button className="btn-primary" style={{ background: '#181a20', border: '1px solid #272a34', width: 'auto', padding: '14px 20px' }} onClick={() => setScreen('disaster_type')}>
-                  Report Incident
-                </button>
-              </div>
-            </div>
-
-            <div className="radar-box">
-              <div style={{ position: 'absolute', top: '12px', right: '12px', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', color: '#ef4444', fontSize: '0.7rem', fontWeight: '700', padding: '4px 8px', borderRadius: '6px' }}>
-                LIVE RADAR
-              </div>
-              <div className="radar-sweep"></div>
-              <div className="radar-circle radar-circle-1"></div>
-              <div className="radar-circle radar-circle-2"></div>
-              <div className="radar-circle radar-circle-3"></div>
-              <div className="radar-blip" style={{ top: '35%', left: '42%' }}></div>
-              <div className="radar-blip" style={{ top: '65%', left: '70%' }}></div>
-            </div>
-          </div>
-
-          <div className="dashboard-grid">
-            <div className="interactive-card" onClick={() => setScreen('disaster_type')}>
-              <AlertTriangle color="#ea580c" size={26} />
-              <h3 style={{ margin: '10px 0 4px', fontSize: '1.05rem' }}>Report Disaster</h3>
-              <p style={{ color: '#9ca3af', fontSize: '0.82rem' }}>Report flood, fire, earthquake, or landslide.</p>
-            </div>
-
-            <div className="interactive-card" onClick={() => setScreen('safe_status')}>
-              <CheckCircle2 color="#10b981" size={26} />
-              <h3 style={{ margin: '10px 0 4px', fontSize: '1.05rem' }}>I'm Safe</h3>
-              <p style={{ color: '#9ca3af', fontSize: '0.82rem' }}>Notify family & rescue system that you are safe.</p>
-            </div>
-
-            <div className="interactive-card" onClick={() => setScreen('map')}>
-              <MapPin color="#ea580c" size={26} />
-              <h3 style={{ margin: '10px 0 4px', fontSize: '1.05rem' }}>Offline Map</h3>
-              <p style={{ color: '#9ca3af', fontSize: '0.82rem' }}>Locate shelters, hospitals, and police offline.</p>
-            </div>
-
-            <div className="interactive-card" onClick={() => setScreen('helplines')}>
-              <Phone color="#ea580c" size={26} />
-              <h3 style={{ margin: '10px 0 4px', fontSize: '1.05rem' }}>Indian Helplines</h3>
-              <p style={{ color: '#9ca3af', fontSize: '0.82rem' }}>Direct emergency calling for NDRF, Police, Fire.</p>
-            </div>
-          </div>
-
-          {/* USER BROADCASTS LIST WITH DELETE COMPLAINT OPTION */}
-          <div className="dark-card" style={{ marginTop: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1.1rem' }}>Local Reported Complaints</h3>
-              <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{reports.length} Total Complaints</span>
-            </div>
-
-            {reports.length === 0 ? (
-              <p style={{ color: '#6b7280', fontSize: '0.85rem', textAlign: 'center', padding: '20px 0' }}>No active complaints recorded.</p>
-            ) : (
-              <div style={{ display: 'grid', gap: '10px' }}>
-                {reports.map((r) => (
-                  <div key={r.id} style={{ background: '#181a20', padding: '14px', borderRadius: '10px', border: '1px solid #272a34', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <strong style={{ fontSize: '0.92rem' }}>{r.type} ({r.id})</strong>
-                        <span style={{ background: r.severity === 'CRITICAL' ? '#451a1a' : '#3f2c13', color: r.severity === 'CRITICAL' ? '#ef4444' : '#f97316', fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
-                          {r.severity}
-                        </span>
-                      </div>
-                      <p style={{ color: '#9ca3af', fontSize: '0.8rem', marginTop: '4px' }}>{r.desc}</p>
-                      <span style={{ color: '#6b7280', fontSize: '0.72rem' }}>📍 {r.location} • 🕒 {r.time}</span>
-                    </div>
-                    
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        style={{ background: '#451a1a', border: '1px solid #ef4444', color: '#ef4444', padding: '6px 10px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }} 
-                        onClick={() => handleDeleteReport(r.id)}
-                      >
-                        <Trash2 size={14} /> Delete Complaint
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* REPORT DISASTER */}
-      {screen === 'disaster_type' && (
-        <div className="dark-card" style={{ maxWidth: '600px', margin: '0 auto' }}>
-          <button style={{ background: 'none', border: 'none', color: '#ea580c', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '16px' }} onClick={() => setScreen('home')}>
-            <ArrowLeft size={16} /> Back
-          </button>
-          <h2 style={{ fontSize: '1.7rem', marginBottom: '4px' }}>What happened?</h2>
-
-          <div className="disaster-grid">
-            {DISASTERS.map((d) => (
-              <div 
-                key={d.id} 
-                className={`disaster-item ${selectedDisaster === d.id ? 'active' : ''}`}
-                onClick={() => setSelectedDisaster(d.id)}
-              >
-                <d.icon size={26} color={selectedDisaster === d.id ? '#ea580c' : '#9ca3af'} style={{ margin: '0 auto 6px' }} />
-                <div style={{ fontSize: '0.82rem', fontWeight: '600' }}>{d.label}</div>
-              </div>
-            ))}
-          </div>
-
-          <button className="btn-primary" style={{ marginTop: '16px' }} onClick={() => setScreen('victim_condition')}>
-            Continue to Severity Status →
-          </button>
-        </div>
-      )}
-
-      {/* VICTIM SEVERITY */}
-      {screen === 'victim_condition' && (
-        <div className="dark-card" style={{ maxWidth: '520px', margin: '0 auto' }}>
-          <button style={{ background: 'none', border: 'none', color: '#ea580c', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '16px' }} onClick={() => setScreen('disaster_type')}>
-            <ArrowLeft size={16} /> Back
-          </button>
-          <h2 style={{ fontSize: '1.7rem', marginBottom: '4px' }}>How serious is your situation?</h2>
-
-          {[
-            { id: 'CRITICAL', label: 'CRITICAL', desc: 'Trapped or severe life-threatening injury', color: '#ef4444' },
-            { id: 'URGENT', label: 'URGENT', desc: 'Medical assistance required immediately', color: '#f97316' },
-            { id: 'SAFE', label: 'SAFE', desc: 'No immediate assistance required', color: '#10b981' }
-          ].map((c) => (
+        <div className="container">
+          <div className="card" style={{ textAlign: 'center' }}>
+            <h3>Are you safe?</h3>
+            <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>HOLD FOR 3 SECONDS TO TRIGGER SOS</p>
             <div 
-              key={c.id} 
-              className={`condition-card ${selectedSeverity === c.id ? 'active' : ''}`}
-              onClick={() => setSelectedSeverity(c.id)}
+              className="sos-hold-btn"
+              onMouseDown={handleSosHoldStart}
+              onMouseUp={handleSosHoldEnd}
+              onTouchStart={handleSosHoldStart}
+              onTouchEnd={handleSosHoldEnd}
             >
-              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: c.color }}></div>
-              <div>
-                <strong style={{ display: 'block', fontSize: '0.92rem' }}>{c.label}</strong>
-                <span style={{ color: '#9ca3af', fontSize: '0.78rem' }}>{c.desc}</span>
-              </div>
+              <AlertTriangle size={36} />
+              <span>SOS</span>
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="card" onClick={() => setScreen('map')} style={{ cursor: 'pointer' }}>
+              <MapIcon size={24} color="#0f172a" />
+              <h4>Offline Map</h4>
+              <p style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>View emergency map without internet.</p>
+            </div>
+            <div className="card" onClick={() => setScreen('helplines')} style={{ cursor: 'pointer' }}>
+              <Phone size={24} color="#0f172a" />
+              <h4>Emergency Help</h4>
+              <p style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Hospitals, police, fire, shelters.</p>
+            </div>
+            <div className="card" onClick={() => setScreen('disaster-type')} style={{ cursor: 'pointer' }}>
+              <AlertTriangle size={24} color="#dc2626" />
+              <h4>Report Disaster</h4>
+              <p style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Report fire, flood, earthquake hazard.</p>
+            </div>
+            <div className="card" onClick={() => setScreen('safe-status')} style={{ cursor: 'pointer' }}>
+              <CheckCircle size={24} color="#16a34a" />
+              <h4>I'm Safe</h4>
+              <p style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Send safe status to contacts & rescue.</p>
+            </div>
+          </div>
+
+          <div className="card" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
+            <h4>Support Relief Efforts</h4>
+            <p style={{ fontSize: '0.8rem', margin: '0.25rem 0' }}>Donate via UPI to support disaster rescue operations.</p>
+            <a href="upi://pay?pa=7082810840@mbk&pn=DisasterMeshRelief&cu=INR" className="btn btn-success" style={{ textDecoration: 'none' }}>
+              <DollarSign size={18} /> Donate via UPI (7082810840@mbk)
+            </a>
+          </div>
+        </div>
+      )}
+
+      {screen === 'disaster-type' && (
+        <div className="container">
+          <h2>What happened?</h2>
+          <p style={{ color: 'var(--muted)' }}>Select the type of emergency you are reporting.</p>
+          <div className="grid-2">
+            {DISASTER_TYPES.map((d) => {
+              const Icon = d.icon;
+              return (
+                <div 
+                  key={d.id} 
+                  className="card" 
+                  style={{ 
+                    textAlign: 'center', 
+                    border: activeReport.type === d.label ? '2px solid var(--accent)' : '1px solid var(--border)',
+                    cursor: 'pointer' 
+                  }}
+                  onClick={() => setActiveReport({ ...activeReport, type: d.label })}
+                >
+                  <Icon size={32} style={{ margin: '0 auto' }} />
+                  <p style={{ marginTop: '0.5rem', fontWeight: 'bold' }}>{d.label}</p>
+                </div>
+              );
+            })}
+          </div>
+          <button className="btn btn-primary" onClick={() => setScreen('victim-condition')} disabled={!activeReport.type}>Next</button>
+        </div>
+      )}
+
+      {screen === 'victim-condition' && (
+        <div className="container">
+          <h2>How serious is your situation?</h2>
+          {[
+            { id: 'CRITICAL', title: 'CRITICAL', sub: 'Trapped or severe injury', class: 'btn-danger' },
+            { id: 'URGENT', title: 'URGENT', sub: 'Medical assistance required', class: 'btn-outline' },
+            { id: 'ASSISTANCE', title: 'NEED ASSISTANCE', sub: 'Food, water or shelter required', class: 'btn-outline' },
+            { id: 'SAFE', title: 'SAFE', sub: 'No immediate assistance required', class: 'btn-success' }
+          ].map((cond) => (
+            <button 
+              key={cond.id} 
+              className={`btn ${cond.class}`} 
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '1rem' }}
+              onClick={() => {
+                setActiveReport({ ...activeReport, condition: cond.id });
+                triggerSos();
+              }}
+            >
+              <strong>{cond.title}</strong>
+              <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>{cond.sub}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {screen === 'sos-active' && (
+        <div className="container" style={{ textAlign: 'center' }}>
+          <div className="card" style={{ borderColor: 'var(--accent)' }}>
+            <AlertTriangle size={48} color="#dc2626" style={{ margin: '0 auto' }} />
+            <h2>SOS ACTIVE</h2>
+            <p>Your emergency request has been saved.</p>
+            <div style={{ textAlign: 'left', marginTop: '1rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '8px' }}>
+              <p><strong>Location:</strong> {location.address}</p>
+              <p><strong>Time:</strong> {new Date().toLocaleTimeString()}</p>
+              <p><strong>Network:</strong> {isOnline ? 'Online' : 'Offline (Highlighted in red)'}</p>
+              <p><strong>Status:</strong> Searching for nearby devices</p>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '1rem' }}>
+              Your SOS will automatically synchronize when connectivity becomes available.
+            </p>
+          </div>
+          <button className="btn btn-outline" onClick={() => setScreen('home')}>Return to Dashboard</button>
+        </div>
+      )}
+
+      {screen === 'map' && (
+        <div className="container">
+          <h3>Emergency Map</h3>
+          <div className="map-container" ref={mapRef}></div>
+          <div className="card">
+            <h4>Nearest Safe Shelter</h4>
+            <p>1.4 km away</p>
+            <button className="btn btn-primary" style={{ marginTop: '0.5rem' }}>VIEW ROUTE</button>
+          </div>
+        </div>
+      )}
+
+      {screen === 'helplines' && (
+        <div className="container">
+          <h3>Emergency Helplines (India)</h3>
+          <div className="card">
+            <p><strong>National Emergency Number:</strong> <a href="tel:112">112</a></p>
+            <p><strong>Police:</strong> <a href="tel:100">100</a></p>
+            <p><strong>Fire:</strong> <a href="tel:101">101</a></p>
+            <p><strong>Ambulance:</strong> <a href="tel:102">102</a></p>
+            <p><strong>Disaster Management (NDRF):</strong> <a href="tel:1078">1078</a></p>
+          </div>
+
+          <h3>Disaster Precautions</h3>
+          {Object.entries(PRECAUTIONS).map(([key, value]) => (
+            <div key={key} className="card">
+              <h4 style={{ textTransform: 'capitalize' }}>{key} Guide</h4>
+              <p><strong>During:</strong></p>
+              <ul>{value.during.map((p, i) => <li key={i}>{p}</li>)}</ul>
+              <p style={{ marginTop: '0.5rem' }}><strong>After:</strong></p>
+              <ul>{value.after.map((p, i) => <li key={i}>{p}</li>)}</ul>
             </div>
           ))}
+        </div>
+      )}
 
-          <div className="input-group" style={{ marginTop: '16px' }}>
-            <label>Complaint Details / Emergency Description</label>
-            <input type="text" className="input-box" placeholder="e.g. Building damaged, water rising..." value={reportDesc} onChange={(e) => setReportDesc(e.target.value)} />
+      {screen === 'safe-status' && (
+        <div className="container" style={{ textAlign: 'center' }}>
+          <CheckCircle size={64} color="#16a34a" style={{ margin: '0 auto' }} />
+          <h2>I'm Safe</h2>
+          <p>Let others know you are safe.</p>
+          <div className="card">
+            <p>Your safe status can be synchronized with your emergency contacts and rescue system.</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '0.5rem' }}>
+              Last updated: {new Date().toLocaleTimeString()}
+            </p>
+          </div>
+          <button className="btn btn-success" onClick={() => setScreen('home')}>CONFIRM SAFE STATUS</button>
+        </div>
+      )}
+
+      {screen === 'admin' && (
+        <div className="container">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2>Command Center</h2>
+            <button className="btn btn-outline" style={{ width: 'auto' }} onClick={handleResetStats}>
+              <RefreshCw size={16} /> Reset Numbers
+            </button>
           </div>
 
-          <button className="btn-primary" style={{ marginTop: '16px' }} onClick={handleReportSubmit}>
-            Broadcast Emergency Alert
-          </button>
-        </div>
-      )}
-
-      {/* ACTIVE SOS */}
-      {screen === 'sos_active' && (
-        <div className="dark-card" style={{ maxWidth: '480px', margin: '0 auto', textAlign: 'center' }}>
-          <div style={{ background: '#451a1a', color: '#fca5a5', padding: '6px 14px', borderRadius: '999px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', fontWeight: '700', marginBottom: '16px', border: '1px solid #ef4444' }}>
-            🚨 SOS BROADCAST ACTIVE
+          <div className="grid-4">
+            <div className="stat-box stat-critical">
+              <h3>{stats.critical}</h3>
+              <span>Critical</span>
+            </div>
+            <div className="stat-box stat-urgent">
+              <h3>{stats.urgent}</h3>
+              <span>Urgent</span>
+            </div>
+            <div className="stat-box stat-assistance">
+              <h3>{stats.assistance}</h3>
+              <span>Assistance</span>
+            </div>
+            <div className="stat-box stat-safe">
+              <h3>{stats.safe}</h3>
+              <span>Safe</span>
+            </div>
           </div>
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '8px' }}>Your complaint has been logged and broadcasted.</h2>
 
-          <button className="btn-primary" style={{ marginTop: '20px' }} onClick={() => setScreen('home')}>
-            Return to Dashboard
-          </button>
-        </div>
-      )}
+          <div className="map-container" ref={mapRef}></div>
 
-      {/* OFFLINE MAP */}
-      {screen === 'map' && (
-        <div className="dark-card" style={{ maxWidth: '650px', margin: '0 auto' }}>
-          <button style={{ background: 'none', border: 'none', color: '#ea580c', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '16px' }} onClick={() => setScreen('home')}>
-            <ArrowLeft size={16} /> Back
-          </button>
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '16px' }}>Offline Map</h2>
-          <p style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Map cached for offline emergency routing.</p>
-        </div>
-      )}
-
-      {/* INDIAN HELPLINES */}
-      {screen === 'helplines' && (
-        <div className="dark-card" style={{ maxWidth: '520px', margin: '0 auto' }}>
-          <button style={{ background: 'none', border: 'none', color: '#ea580c', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '16px' }} onClick={() => setScreen('home')}>
-            <ArrowLeft size={16} /> Back
-          </button>
-          <h2 style={{ fontSize: '1.6rem', marginBottom: '16px' }}>Indian Emergency Helplines</h2>
-
-          <div style={{ display: 'grid', gap: '10px' }}>
-            {HELPLINES.map((h, idx) => (
-              <a key={idx} href={`tel:${h.number}`} style={{ textDecoration: 'none', background: '#181a20', border: '1px solid #272a34', padding: '14px 18px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff' }}>
+          <h3>Active Disaster Reports ({complaints.length})</h3>
+          {complaints.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>No reports recorded yet.</p>
+          ) : (
+            complaints.map((c) => (
+              <div key={c.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <strong style={{ display: 'block', fontSize: '0.92rem' }}>{h.name}</strong>
-                  <span style={{ color: '#ea580c', fontSize: '1.1rem', fontWeight: '800' }}>{h.number}</span>
+                  <strong>{c.id} - {c.type}</strong>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                    Condition: {c.condition} | Time: {c.time}
+                  </p>
+                  <p style={{ fontSize: '0.8rem' }}>{c.address}</p>
                 </div>
-                <Phone size={18} color="#34d399" />
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* SAFE STATUS */}
-      {screen === 'safe_status' && (
-        <div className="dark-card" style={{ maxWidth: '480px', margin: '0 auto', textAlign: 'center' }}>
-          <button style={{ background: 'none', border: 'none', color: '#ea580c', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', marginBottom: '16px' }} onClick={() => setScreen('home')}>
-            <ArrowLeft size={16} /> Back
-          </button>
-          <CheckCircle2 color="#10b981" size={48} style={{ margin: '0 auto 12px' }} />
-          <h2 style={{ fontSize: '1.6rem', marginBottom: '6px' }}>I'm Safe Status</h2>
-          <button className="btn-primary" onClick={() => setSafeStatusLogged(true)}>
-            {safeStatusLogged ? '✓ STATUS BROADCASTED' : 'Broadcast "I\'M SAFE"'}
-          </button>
-        </div>
-      )}
-
-      {/* SCREEN 10: ADMIN HUB WITH RESET TO 0, LIVE COMPLAINTS SHOW, AND DELETE COMPLAINT */}
-      {screen === 'command_center' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <h2 style={{ fontSize: '1.5rem' }}>DisasterMesh Admin Hub</h2>
-              <span style={{ color: '#34d399', fontSize: '0.78rem' }}>● Real-time Emergency Monitoring</span>
-            </div>
-            
-            {/* COUNTER CARDS & RESET BUTTON */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ color: '#ef4444', background: '#451a1a', border: '1px solid #ef4444', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700' }}>
-                {criticalCount} Critical
-              </span>
-              <span style={{ color: '#f97316', background: '#3f2c13', border: '1px solid #f97316', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700' }}>
-                {urgentCount} Urgent
-              </span>
-              <span style={{ color: '#10b981', background: '#064e3b', border: '1px solid #10b981', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700' }}>
-                {safeCount} Safe
-              </span>
-
-              {/* RESET NUMBER COUNTER TO 0 BUTTON */}
-              <button 
-                onClick={handleResetSystem}
-                style={{ background: '#dc2626', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '8px', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-              >
-                <RotateCcw size={14} /> Reset System to 0
-              </button>
-            </div>
-          </div>
-
-          {/* REPORTED COMPLAINTS LIST IN ADMIN HUB */}
-          <div className="dark-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1.1rem' }}>Reported Complaints ({reports.length})</h3>
-            </div>
-
-            {reports.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '30px', color: '#6b7280' }}>
-                <p>All counters are at 0. No reported complaints currently active.</p>
+                <button 
+                  className="btn btn-danger" 
+                  style={{ width: 'auto', padding: '0.5rem' }}
+                  onClick={() => handleDeleteComplaint(c.id)}
+                >
+                  <Trash2 size={16} /> Delete
+                </button>
               </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
-                {reports.map((c) => (
-                  <div key={c.id} style={{ background: '#181a20', padding: '16px', borderRadius: '12px', border: '1px solid #272a34', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <strong style={{ fontSize: '1rem' }}>Complaint {c.id}</strong>
-                        <span style={{ color: c.severity === 'CRITICAL' ? '#ef4444' : '#f97316', fontWeight: '800', fontSize: '0.75rem', background: c.severity === 'CRITICAL' ? '#451a1a' : '#3f2c13', padding: '2px 8px', borderRadius: '4px' }}>
-                          {c.severity}
-                        </span>
-                      </div>
-                      
-                      <p style={{ fontSize: '0.85rem', color: '#f3f4f6', marginBottom: '8px' }}>
-                        <strong>Type:</strong> {c.type}
-                      </p>
-                      <p style={{ fontSize: '0.82rem', color: '#9ca3af', marginBottom: '12px' }}>
-                        <strong>Description:</strong> {c.desc}
-                      </p>
-                      
-                      <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: '14px' }}>
-                        <div>📍 Location: {c.location}</div>
-                        <div>🕒 Reported: {c.time}</div>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid #272a34', paddingTop: '12px' }}>
-                      <button 
-                        className="btn-primary" 
-                        style={{ padding: '8px', fontSize: '0.8rem' }}
-                        onClick={() => alert(`Rescue team dispatched for Complaint ${c.id}`)}
-                      >
-                        Dispatch Rescue
-                      </button>
-                      
-                      {/* DELETE COMPLAINT FROM ADMIN HUB */}
-                      <button 
-                        style={{ background: '#451a1a', border: '1px solid #ef4444', color: '#ef4444', padding: '8px 12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.8rem' }}
-                        onClick={() => handleDeleteReport(c.id)}
-                      >
-                        <Trash2 size={14} /> Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+            ))
+          )}
         </div>
       )}
 
-      {/* BOTTOM NAVIGATION */}
-      <div className="bottom-nav">
-        <button className={`nav-item ${screen === 'home' ? 'active' : ''}`} onClick={() => setScreen('home')}>
-          <Flame size={18} /> Home
-        </button>
-        <button className={`nav-item ${screen === 'map' ? 'active' : ''}`} onClick={() => setScreen('map')}>
-          <Compass size={18} /> Map
-        </button>
-        <button className={`nav-item ${screen === 'command_center' ? 'active' : ''}`} onClick={() => setScreen('command_center')}>
-          <Monitor size={18} /> Admin
-        </button>
-      </div>
-
+      {screen !== 'landing' && screen !== 'login' && screen !== 'register' && (
+        <nav className="nav-bar">
+          <button className={`nav-item ${screen === 'home' ? 'active' : ''}`} onClick={() => setScreen('home')}>
+            <Home size={20} />
+            Home
+          </button>
+          <button className={`nav-item ${screen === 'map' ? 'active' : ''}`} onClick={() => setScreen('map')}>
+            <MapIcon size={20} />
+            Map
+          </button>
+          <button className={`nav-item ${screen === 'helplines' ? 'active' : ''}`} onClick={() => setScreen('helplines')}>
+            <Phone size={20} />
+            Helplines
+          </button>
+          <button className={`nav-item ${screen === 'admin' ? 'active' : ''}`} onClick={() => setScreen('admin')}>
+            <Settings size={20} />
+            Admin
+          </button>
+        </nav>
+      )}
     </div>
   );
 }

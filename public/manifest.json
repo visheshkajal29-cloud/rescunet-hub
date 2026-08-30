@@ -1,9 +1,9 @@
 {
   "short_name": "DisasterMesh",
-  "name": "DisasterMesh Emergency Network",
+  "name": "DisasterMesh Emergency PWA",
   "icons": [],
   "start_url": "/",
   "background_color": "#0d0e12",
-  "theme_color": "#0d0e12",
+  "theme_color": "#ea580c",
   "display": "standalone"
 }
