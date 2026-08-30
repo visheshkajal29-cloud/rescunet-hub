@@ -1,9 +1,15 @@
 {
   "short_name": "DisasterMesh",
-  "name": "DisasterMesh Emergency PWA",
-  "icons": [],
+  "name": "DisasterMesh Emergency Response",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
   "start_url": "/",
-  "background_color": "#0d0e12",
-  "theme_color": "#ea580c",
+  "background_color": "#0f172a",
+  "theme_color": "#dc2626",
   "display": "standalone"
 }

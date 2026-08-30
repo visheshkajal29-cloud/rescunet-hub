@@ -9,15 +9,7 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Make sure the path starts with /src/main.jsx -->
     <script type="module" src="/src/main.jsx"></script>
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch((err) => {
-            console.log('ServiceWorker registration failed: ', err);
-          });
-        });
-      }
-    </script>
   </body>
 </html>
