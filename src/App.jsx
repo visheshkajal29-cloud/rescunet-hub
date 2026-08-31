@@ -1,12 +1,76 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   AlertTriangle, Phone, CheckCircle, 
-  Flame, CloudRain, Zap, Activity, Info, RefreshCw, Trash2, Home, Map as MapIcon, Settings, DollarSign, Bot, Send
+  Flame, CloudRain, Zap, Activity, Info, RefreshCw, Trash2, Home, Map as MapIcon, Settings, DollarSign, Bot, Send, Plus, X
 } from 'lucide-react';
 
 const INITIAL_STATS = { critical: 28, urgent: 54, assistance: 91, safe: 312 };
 
-const EMERGENCY_NUMBERS = ["+917042831097", "+917082810840"];
+// IndexedDB Helper Functions
+const DB_NAME = 'DisasterMeshDB';
+const DB_VERSION = 1;
+
+const initDB = () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('users')) {
+        db.createObjectStore('users', { keyPath: 'mobile' });
+      }
+      if (!db.objectStoreNames.contains('reports')) {
+        db.createObjectStore('reports', { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+};
+
+const saveUserToDB = async (userData) => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('users', 'readwrite');
+    const store = tx.objectStore('users');
+    const req = store.put(userData);
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => reject(req.error);
+  });
+};
+
+const getUserFromDB = async (mobile) => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('users', 'readonly');
+    const store = tx.objectStore('users');
+    const req = store.get(mobile);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+};
+
+const saveReportToDB = async (reportData) => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('reports', 'readwrite');
+    const store = tx.objectStore('reports');
+    const req = store.put(reportData);
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => reject(req.error);
+  });
+};
+
+const getAllReportsFromDB = async () => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('reports', 'readonly');
+    const store = tx.objectStore('reports');
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+};
 
 const DISASTER_TYPES = [
   { id: 'earthquake', label: 'Earthquake', icon: Activity },
@@ -59,10 +123,14 @@ export default function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [location, setLocation] = useState({ lat: 28.6139, lng: 77.2090, address: 'Detecting Location...' });
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('dm_user')) || null);
-  const [complaints, setComplaints] = useState(() => JSON.parse(localStorage.getItem('dm_reports')) || []);
+  const [complaints, setComplaints] = useState([]);
   const [stats, setStats] = useState(() => JSON.parse(localStorage.getItem('dm_stats')) || INITIAL_STATS);
   const [activeReport, setActiveReport] = useState({ type: '', condition: '' });
   const [holdTimer, setHoldTimer] = useState(null);
+
+  // Form & Auth States
+  const [loginError, setLoginError] = useState('');
+  const [signupContacts, setSignupContacts] = useState(['']);
 
   // AI Chat States
   const [chatInput, setChatInput] = useState('');
@@ -79,6 +147,18 @@ export default function App() {
     const handleOffline = () => setIsOnline(false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
+    // Initialize Database and sync reports
+    getAllReportsFromDB().then((dbReports) => {
+      if (dbReports && dbReports.length > 0) {
+        setComplaints(dbReports);
+      } else {
+        const local = JSON.parse(localStorage.getItem('dm_reports')) || [];
+        setComplaints(local);
+      }
+    }).catch(() => {
+      setComplaints(JSON.parse(localStorage.getItem('dm_reports')) || []);
+    });
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -132,6 +212,76 @@ export default function App() {
     }
   }, [chatMessages, screen]);
 
+  // Auth Functions
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    const mobile = e.target.mobile.value.trim();
+    const pin = e.target.pin.value.trim();
+
+    try {
+      const existingUser = await getUserFromDB(mobile);
+      if (!existingUser) {
+        setLoginError('Account not found! Please SIGN UP first.');
+        return;
+      }
+      if (existingUser.pin !== pin) {
+        setLoginError('Incorrect PIN. Please try again.');
+        return;
+      }
+
+      setUser(existingUser);
+      localStorage.setItem('dm_user', JSON.stringify(existingUser));
+      setScreen('home');
+    } catch (err) {
+      setLoginError('Database lookup failed. Please try signing up.');
+    }
+  };
+
+  const handleAddContactField = () => {
+    setSignupContacts([...signupContacts, '']);
+  };
+
+  const handleRemoveContactField = (index) => {
+    const list = [...signupContacts];
+    list.splice(index, 1);
+    setSignupContacts(list);
+  };
+
+  const handleContactChange = (index, value) => {
+    const list = [...signupContacts];
+    list[index] = value;
+    setSignupContacts(list);
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    const validContacts = signupContacts.filter((c) => c.trim() !== '');
+
+    if (validContacts.length === 0) {
+      alert('Please enter at least one emergency contact number.');
+      return;
+    }
+
+    const userData = {
+      name: formData.get('name'),
+      mobile: formData.get('mobile').trim(),
+      pin: formData.get('pin').trim(),
+      blood: formData.get('blood'),
+      contacts: validContacts
+    };
+
+    try {
+      await saveUserToDB(userData);
+      setUser(userData);
+      localStorage.setItem('dm_user', JSON.stringify(userData));
+      setScreen('home');
+    } catch (err) {
+      alert('Failed to save user account to IndexedDB database.');
+    }
+  };
+
   const generateAiResponse = (userText) => {
     const text = userText.toLowerCase();
 
@@ -148,16 +298,17 @@ export default function App() {
       return "🔥 Fire Guide:\n• Stay low to the ground below smoke.\n• Test doors for heat before opening.\n• If clothes catch fire: Stop, Drop, and Roll!";
     }
     if (text.includes('helpline') || text.includes('number') || text.includes('phone') || text.includes('call')) {
-      return "📞 Emergency Numbers:\n• Primary Contacts: +91 7042831097, +91 7082810840\n• National Emergency: 112\n• Police: 100 | Fire: 101 | Ambulance: 102\n• NDRF Disaster Helpline: 1078";
+      const storedNums = user && user.contacts ? user.contacts.join(', ') : '+917042831097, +917082810840';
+      return `📞 Emergency Numbers:\n• Your Saved Emergency Contacts: ${storedNums}\n• National Emergency: 112\n• Police: 100 | Fire: 101 | Ambulance: 102\n• NDRF Disaster Helpline: 1078`;
     }
     if (text.includes('location') || text.includes('where am i') || text.includes('gps')) {
       return `📍 Your Current Detected Location is:\nLatitude: ${location.lat}\nLongitude: ${location.lng}\nAddress: ${location.address}`;
     }
     if (text.includes('sos') || text.includes('help me') || text.includes('emergency')) {
-      return "🚨 To trigger an Emergency SOS, return to the Home screen and HOLD the red SOS button for 3 seconds. Your distress call will be logged and dispatched simultaneously to +91 7042831097 and +91 7082810840!";
+      return "🚨 To trigger an Emergency SOS, return to the Home screen and HOLD the red SOS button for 3 seconds. It will redirect you to report your disaster type and dispatch SMS alerts directly to your saved contacts!";
     }
     if (text.includes('offline') || text.includes('internet') || text.includes('network')) {
-      return "📡 DisasterMesh operates in 100% Offline Mode using browser LocalStorage and PWA Cache. All your data will sync once network connectivity returns.";
+      return "📡 DisasterMesh operates in 100% Offline Mode using browser LocalStorage and IndexedDB database. All data persists safely offline.";
     }
 
     return "🤖 DisasterMesh AI Advice: Keep calm, evaluate your physical surroundings, move to an open safe area, and trigger the main SOS button on the Home tab if you need urgent rescue.";
@@ -175,9 +326,10 @@ export default function App() {
     setChatInput('');
   };
 
+  // SOS Hold Event -> Routes to 'disaster-type' report flow
   const handleSosHoldStart = () => {
     const timer = setTimeout(() => {
-      triggerSos();
+      setScreen('disaster-type');
     }, 3000);
     setHoldTimer(timer);
   };
@@ -186,10 +338,15 @@ export default function App() {
     if (holdTimer) clearTimeout(holdTimer);
   };
 
-  // Broadcasts simultaneous SMS alerts to both +91 7042831097 and +91 7082810840
+  // Sends SMS to specifically logged-in user contacts
   const sendSmsAlerts = (report) => {
+    const targetNumbers = (user && user.contacts && user.contacts.length > 0)
+      ? user.contacts
+      : ["+917042831097", "+917082810840"];
+
     const message = encodeURIComponent(
       `🚨 DISASTERMESH EMERGENCY ALERT!\n` +
+      `User: ${user ? user.name : 'Unknown'}\n` +
       `Type: ${report.type}\n` +
       `Severity: ${report.condition}\n` +
       `Location: ${report.address}\n` +
@@ -197,10 +354,9 @@ export default function App() {
       `Lat/Lng: ${report.lat}, ${report.lng}`
     );
 
-    // iOS and Android cross-compatible multi-recipient SMS URL format
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const delimiter = isIOS ? '&' : '?';
-    const recipients = EMERGENCY_NUMBERS.join(isIOS ? ';' : ',');
+    const recipients = targetNumbers.join(isIOS ? ';' : ',');
     const smsUrl = `sms:${recipients}${delimiter}body=${message}`;
     
     try {
@@ -210,7 +366,11 @@ export default function App() {
     }
   };
 
-  const triggerSos = () => {
+  const triggerSos = async () => {
+    const targetContacts = (user && user.contacts && user.contacts.length > 0)
+      ? user.contacts
+      : ["+917042831097", "+917082810840"];
+
     const newReport = {
       id: 'DM-' + Math.floor(1000 + Math.random() * 9000),
       type: activeReport.type || 'General Emergency',
@@ -220,15 +380,19 @@ export default function App() {
       address: location.address,
       time: new Date().toLocaleTimeString(),
       status: 'Searching',
-      recipients: EMERGENCY_NUMBERS
+      recipients: targetContacts
     };
 
     setComplaints([newReport, ...complaints]);
     setStats((prev) => ({ ...prev, critical: prev.critical + 1 }));
-    
-    // Automatically trigger SMS alert dispatch
-    sendSmsAlerts(newReport);
 
+    try {
+      await saveReportToDB(newReport);
+    } catch (err) {
+      console.log("Failed to store report in IndexedDB");
+    }
+    
+    sendSmsAlerts(newReport);
     setScreen('sos-active');
   };
 
@@ -239,15 +403,6 @@ export default function App() {
   const handleResetStats = () => {
     setStats(INITIAL_STATS);
     localStorage.setItem('dm_stats', JSON.stringify(INITIAL_STATS));
-  };
-
-  const handleRegister = (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const userData = Object.fromEntries(formData.entries());
-    setUser(userData);
-    localStorage.setItem('dm_user', JSON.stringify(userData));
-    setScreen('home');
   };
 
   const getCurrentPrecautions = () => {
@@ -261,6 +416,10 @@ export default function App() {
     if (key.includes('industrial')) return { title: 'Industrial Accident', data: PRECAUTIONS.industrial };
     return { title: 'General Disaster Safety', data: PRECAUTIONS.other };
   };
+
+  const activeContacts = (user && user.contacts && user.contacts.length > 0) 
+    ? user.contacts 
+    : ["+917042831097", "+917082810840"];
 
   return (
     <div className={screen === 'admin' ? 'admin-mode' : ''}>
@@ -277,7 +436,6 @@ export default function App() {
 
       {screen === 'landing' && (
         <div className="container" style={{ textAlign: 'center', justifyContent: 'center' }}>
-          {/* Main Landing Page Custom Logo */}
           <div className="landing-logo-wrapper">
             <img src="/logo.png" alt="DisasterMesh Main Logo" className="landing-logo" />
           </div>
@@ -292,12 +450,10 @@ export default function App() {
           <button className="btn btn-primary" onClick={() => setScreen('register')}>GET STARTED</button>
           <button className="btn btn-outline" onClick={() => setScreen('login')}>LOGIN</button>
           
-          {/* Large Emergency Access Button */}
           <button className="btn btn-danger btn-emergency-large" onClick={() => setScreen('home')}>
             <AlertTriangle size={24} /> EMERGENCY ACCESS
           </button>
 
-          {/* UPI Donation Button Under Emergency Access Button */}
           <div className="card" style={{ background: '#f0fdf4', borderColor: '#bbf7d0', marginTop: '0.75rem' }}>
             <h4 style={{ color: '#166534', margin: 0, fontSize: '0.95rem' }}>Support Relief Efforts</h4>
             <p style={{ fontSize: '0.78rem', color: '#15803d', margin: '0.25rem 0 0.5rem 0' }}>Donate via UPI to support disaster rescue operations.</p>
@@ -306,7 +462,6 @@ export default function App() {
             </a>
           </div>
 
-          {/* Animated Developed by Banner at Bottom of First Page */}
           <div className="resolvers-animated-banner" style={{ marginTop: '1.25rem', width: '100%', textAlign: 'center' }}>
             <span className="resolvers-text">DEVELOPED BY THE RESOLVERS</span>
           </div>
@@ -318,14 +473,22 @@ export default function App() {
           <h2>Welcome Back</h2>
           <p style={{ color: 'var(--muted)' }}>Access your DisasterMesh emergency profile</p>
 
-          <form onSubmit={(e) => { e.preventDefault(); setScreen('home'); }}>
+          {loginError && (
+            <div style={{ background: '#fee2e2', color: '#991b1b', padding: '0.75rem', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 'bold' }}>
+              {loginError}
+            </div>
+          )}
+
+          <form onSubmit={handleLoginSubmit}>
             <label>Mobile Number</label>
-            <input className="input-field" type="tel" required />
+            <input className="input-field" name="mobile" type="tel" required placeholder="Enter registered mobile number" />
             <label>PIN</label>
-            <input className="input-field" type="password" required />
+            <input className="input-field" name="pin" type="password" required placeholder="Enter your PIN" />
             <button className="btn btn-primary" type="submit">LOGIN</button>
           </form>
-          <button className="btn btn-outline" onClick={() => setScreen('register')}>Don't have an account? SIGN UP</button>
+          <button className="btn btn-outline" onClick={() => { setLoginError(''); setScreen('register'); }}>
+            Don't have an account? SIGN UP
+          </button>
           <button className="btn btn-danger btn-emergency-large" style={{ marginTop: '0.5rem' }} onClick={() => setScreen('home')}>
             <AlertTriangle size={24} /> EMERGENCY ACCESS
           </button>
@@ -335,19 +498,44 @@ export default function App() {
       {screen === 'register' && (
         <div className="container">
           <h2>Create Account</h2>
+          <p style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>Your profile & emergency numbers will be saved in IndexedDB.</p>
           <form onSubmit={handleRegister}>
             <label>Full Name</label>
-            <input className="input-field" name="name" required />
+            <input className="input-field" name="name" required placeholder="John Doe" />
             <label>Mobile Number</label>
-            <input className="input-field" name="mobile" required />
-            <label>Emergency Contact</label>
-            <input className="input-field" name="emergency" required />
+            <input className="input-field" name="mobile" type="tel" required placeholder="e.g. 9876543210" />
+            
+            <label>Emergency Contacts (1 or more)</label>
+            {signupContacts.map((contact, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <input 
+                  className="input-field" 
+                  style={{ marginBottom: 0 }} 
+                  type="tel" 
+                  required 
+                  placeholder={`Emergency Phone #${idx + 1}`}
+                  value={contact}
+                  onChange={(e) => handleContactChange(idx, e.target.value)}
+                />
+                {signupContacts.length > 1 && (
+                  <button type="button" className="btn btn-danger" style={{ width: 'auto', padding: '0 0.75rem' }} onClick={() => handleRemoveContactField(idx)}>
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button type="button" className="btn btn-outline" style={{ marginBottom: '0.75rem', fontSize: '0.8rem' }} onClick={handleAddContactField}>
+              <Plus size={16} /> Add Another Emergency Contact
+            </button>
+
             <label>Set PIN</label>
-            <input className="input-field" type="password" name="pin" required />
+            <input className="input-field" type="password" name="pin" required placeholder="4-digit PIN" />
+            
             <h3>Medical Info (Optional)</h3>
             <label>Blood Type</label>
             <input className="input-field" name="blood" placeholder="e.g. O+" />
-            <button className="btn btn-primary" type="submit">CREATE ACCOUNT</button>
+            
+            <button className="btn btn-primary" type="submit">CREATE ACCOUNT & SAVE</button>
           </form>
           <button className="btn btn-outline" onClick={() => setScreen('login')}>Already have an account? LOGIN</button>
         </div>
@@ -357,7 +545,7 @@ export default function App() {
         <div className="container">
           <div className="card" style={{ textAlign: 'center' }}>
             <h3>Are you safe?</h3>
-            <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>HOLD FOR 3 SECONDS TO TRIGGER SOS</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>HOLD FOR 3 SECONDS TO TRIGGER SOS & REPORT</p>
             <div 
               className="sos-hold-btn"
               onMouseDown={handleSosHoldStart}
@@ -369,7 +557,7 @@ export default function App() {
               <span>SOS</span>
             </div>
             <p style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '0.5rem', fontWeight: 'bold' }}>
-              🚨 Broadcasts dual SMS simultaneously to +91 7042831097 & +91 7082810840
+              🚨 Hold redirecting to report route. Emergency SMS targets: {activeContacts.join(', ')}
             </p>
           </div>
 
@@ -500,34 +688,34 @@ export default function App() {
           <div className="card" style={{ textAlign: 'center', borderColor: 'var(--accent)' }}>
             <AlertTriangle size={48} color="#dc2626" style={{ margin: '0 auto' }} />
             <h2 style={{ color: '#dc2626', margin: '0.5rem 0' }}>SOS TRANSMITTED</h2>
-            <p style={{ fontWeight: '600' }}>Your distress signal has been logged & queued.</p>
+            <p style={{ fontWeight: '600' }}>Your distress signal has been logged & saved to database.</p>
             
-            {/* Alert Sent Confirmation Box */}
             <div style={{ margin: '0.75rem 0', padding: '0.65rem', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '8px' }}>
               <p style={{ fontSize: '0.85rem', color: '#991b1b', fontWeight: 'bold', margin: 0 }}>
-                📲 Simultaneous SMS Triggered To Primary Responders:
+                📲 SMS Triggered To Your Saved Contacts:
               </p>
               <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
-                <a href={`tel:+917042831097`} className="sms-number-tag">📞 +91 7042831097</a>
-                <a href={`tel:+917082810840`} className="sms-number-tag">📞 +91 7082810840</a>
+                {activeContacts.map((num, i) => (
+                  <a key={i} href={`tel:${num}`} className="sms-number-tag">📞 {num}</a>
+                ))}
               </div>
             </div>
 
             <div style={{ textAlign: 'left', marginTop: '0.5rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '8px', borderLeft: '4px solid #dc2626' }}>
+              <p><strong>Reported By:</strong> {user ? user.name : 'Unknown'}</p>
               <p><strong>Emergency Type:</strong> {activeReport.type || 'General Emergency'}</p>
               <p><strong>Severity:</strong> {activeReport.condition || 'CRITICAL'}</p>
               <p><strong>Location:</strong> {location.address}</p>
               <p><strong>Time:</strong> {new Date().toLocaleTimeString()}</p>
-              <p><strong>Network State:</strong> {isOnline ? 'ONLINE' : 'OFFLINE (Saved locally for Mesh Sync)'}</p>
+              <p><strong>Database:</strong> Stored in IndexedDB</p>
             </div>
 
-            {/* Manual Resend SMS Button */}
             <button 
               className="btn btn-danger" 
               style={{ marginTop: '0.75rem' }} 
               onClick={() => sendSmsAlerts(complaints[0] || { type: 'General Emergency', condition: 'CRITICAL', address: location.address, time: new Date().toLocaleTimeString(), lat: location.lat, lng: location.lng })}
             >
-              <Send size={18} /> Resend SMS Alert to Both Numbers
+              <Send size={18} /> Resend SMS Alert
             </button>
           </div>
 
@@ -581,7 +769,7 @@ export default function App() {
         <div className="container">
           <h3>Emergency Helplines (India)</h3>
           <div className="card">
-            <p><strong>Primary Responders:</strong> <a href="tel:+917042831097">+91 7042831097</a> / <a href="tel:+917082810840">+91 7082810840</a></p>
+            <p><strong>Your Emergency Contacts:</strong> {activeContacts.join(', ')}</p>
             <p><strong>National Emergency Number:</strong> <a href="tel:112">112</a></p>
             <p><strong>Police:</strong> <a href="tel:100">100</a></p>
             <p><strong>Fire:</strong> <a href="tel:101">101</a></p>
@@ -659,7 +847,7 @@ export default function App() {
                     Condition: {c.condition} | Time: {c.time}
                   </p>
                   <p style={{ fontSize: '0.8rem' }}>{c.address}</p>
-                  <p style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 'bold' }}>Dispatched to: +91 7042831097, +91 7082810840</p>
+                  <p style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 'bold' }}>Dispatched to: {c.recipients ? c.recipients.join(', ') : activeContacts.join(', ')}</p>
                 </div>
                 <button 
                   className="btn btn-danger" 
